@@ -1,19 +1,19 @@
 using System.Threading.Channels;
-using Transcoder.Services.BackgroundJobs;
+using Transcoder.Model;
 
 namespace Transcoder.Services.BackgroundQueue;
 
 public interface IBackgroundTaskQueue
 {
-    ValueTask QueueBackgroundWorkItemAsync(IBackgroundJob workItem);
+    ValueTask QueueBackgroundWorkItemAsync(BaseProcessingJob workItem);
 
-    ValueTask<IBackgroundJob> DequeueAsync(
+    ValueTask<BaseProcessingJob> DequeueAsync(
         CancellationToken cancellationToken);
 }
 
 public class BackgroundTaskQueue : IBackgroundTaskQueue
 {
-    private readonly Channel<IBackgroundJob> _queue;
+    private readonly Channel<BaseProcessingJob> _queue;
 
     public BackgroundTaskQueue(int capacity)
     {
@@ -26,10 +26,10 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
         {
             FullMode = BoundedChannelFullMode.Wait
         };
-        _queue = Channel.CreateBounded<IBackgroundJob>(options);
+        _queue = Channel.CreateBounded<BaseProcessingJob>(options);
     }
 
-    public async ValueTask QueueBackgroundWorkItemAsync(IBackgroundJob workItem)
+    public async ValueTask QueueBackgroundWorkItemAsync(BaseProcessingJob workItem)
     {
         if (workItem == null)
         {
@@ -39,7 +39,7 @@ public class BackgroundTaskQueue : IBackgroundTaskQueue
         await _queue.Writer.WriteAsync(workItem);
     }
 
-    public async ValueTask<IBackgroundJob> DequeueAsync(
+    public async ValueTask<BaseProcessingJob> DequeueAsync(
         CancellationToken cancellationToken)
     {
         var workItem = await _queue.Reader.ReadAsync(cancellationToken);

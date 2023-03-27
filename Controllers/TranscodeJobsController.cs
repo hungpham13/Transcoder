@@ -19,10 +19,15 @@ public class TranscodeJobsController : ApiController
         _transcodeService = transcodeService;
     }
 
+    
     [HttpGet("{id:guid}")]
     public IActionResult GetJob(Guid id)
     {
-        return Ok();
+        ErrorOr<TranscodeJob> transcodeJobResult = _transcodeService.GetTranscodeJob(id);
+        return transcodeJobResult.Match(
+            transcodeJob => Ok(MapTranscodeResponse(transcodeJob)),
+            errors => Problem(errors)
+        );
     }
     
     [HttpPost]
@@ -31,9 +36,9 @@ public class TranscodeJobsController : ApiController
         ErrorOr<TranscodeJob> requestToFormat = TranscodeJob.From(request);
         if (requestToFormat.IsError) return Problem(requestToFormat.Errors);
         var transcodeJob = requestToFormat.Value;
-        ErrorOr<Created> createTranscodeJob = _transcodeService.CreateTranscodeJob(transcodeJob, request.autoStart);
+        var createTranscodeJob = _transcodeService.CreateTranscodeJob(transcodeJob, request.autoStart);
 
-        return createTranscodeJob.Match(created => CreatedAtAction(
+        return createTranscodeJob.Result.Match(created => CreatedAtAction(
             actionName: nameof(GetJob),
             routeValues: new {id= transcodeJob.Id},
             value: MapTranscodeResponse(transcodeJob)),
@@ -42,15 +47,22 @@ public class TranscodeJobsController : ApiController
     }
     
     [HttpPut("{id:guid}/Start")]
-    public IActionResult StartJob(Guid id)
+    public async Task<IActionResult> StartJob(Guid id)
     {
+        ErrorOr<TranscodeJob> transcodeJobResult = _transcodeService.GetTranscodeJob(id);
+        if (transcodeJobResult.IsError) return Problem(transcodeJobResult.Errors);
+        await _transcodeService.StartTranscodeJob(transcodeJobResult.Value);
         return Ok();
     }
     
     [HttpPut("{id:guid}/Stop")]
     public IActionResult StopJob(Guid id)
     {
-        return Ok();
+        ErrorOr<TranscodeJob> result = _transcodeService.StopTranscodeJob(id);
+        return result.Match(
+            job => Ok(MapTranscodeResponse(job)),
+            errors => Problem(errors)
+            );
     }
     
     [HttpGet("")]

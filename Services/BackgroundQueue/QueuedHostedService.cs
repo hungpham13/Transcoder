@@ -1,14 +1,22 @@
+using Transcoder.Model;
+using Transcoder.Services.TranscodeJobs;
+
 namespace Transcoder.Services.BackgroundQueue;
 
 public class QueuedHostedService : BackgroundService
 {
     private readonly ILogger<QueuedHostedService> _logger;
+    private readonly ITranscodeProcessingService _transcodeProcessingService;
 
-    public QueuedHostedService(IBackgroundTaskQueue taskQueue, 
-        ILogger<QueuedHostedService> logger)
+    public QueuedHostedService(
+        IBackgroundTaskQueue taskQueue, 
+        ILogger<QueuedHostedService> logger,
+        ITranscodeProcessingService processingService
+        )
     {
         TaskQueue = taskQueue;
         _logger = logger;
+        _transcodeProcessingService = processingService;
     }
 
     public IBackgroundTaskQueue TaskQueue { get; }
@@ -16,9 +24,7 @@ public class QueuedHostedService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation(
-            $"Queued Hosted Service is running.{Environment.NewLine}" +
-            $"{Environment.NewLine}Tap W to add a work item to the " +
-            $"background queue.{Environment.NewLine}");
+            $"Queued Hosted Service is running.{Environment.NewLine}");
 
         await BackgroundProcessing(stoppingToken);
     }
@@ -32,7 +38,10 @@ public class QueuedHostedService : BackgroundService
 
             try
             {
-                workItem.Run();
+                if (workItem is TranscodeProcessingJob transcodeProcessingJob)
+                {
+                    await _transcodeProcessingService.Run(transcodeProcessingJob);
+                }
             }
             catch (Exception ex)
             {

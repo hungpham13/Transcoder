@@ -22,6 +22,7 @@ builder.Services.AddDbContext<TranscoderDbContext>(
 
 builder.Services.AddScoped<ICacheService, CacheService>();
 builder.Services.AddScoped(typeof(IDatabaseService<>), typeof(DatabaseService<>));
+builder.Services.AddControllers().AddNewtonsoftJson();
 
 builder.Services.AddScoped<ITranscodeService, TranscodeService>();
 builder.Services.AddHostedService<QueuedHostedService>();

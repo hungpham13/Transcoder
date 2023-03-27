@@ -1,7 +1,5 @@
 using ErrorOr;
 using Transcoder.Model;
-using Transcoder.Persistence;
-using Transcoder.Services.BackgroundJobs;
 using Transcoder.Services.BackgroundQueue;
 using Transcoder.Services.Storage;
 
@@ -13,7 +11,7 @@ public class TranscodeService : ITranscodeService
     private readonly ILogger _logger;
     private readonly CancellationToken _cancellationToken;
     private readonly IDatabaseService<TranscodeJob> _dbService;
-    private readonly IServiceProvider _serviceProvider;
+    private readonly ICacheService _cacheService;
     private readonly IDictionary<Guid, CancellationTokenSource> _cancellationSources = new Dictionary<Guid, CancellationTokenSource>();
 
     public TranscodeService(
@@ -21,50 +19,65 @@ public class TranscodeService : ITranscodeService
         IServiceProvider serviceProvider,
         ILogger<TranscodeService> logger,
         IHostApplicationLifetime appLifetime,
-        IDatabaseService<TranscodeJob> dbService
+        IDatabaseService<TranscodeJob> dbService,
+        ICacheService cacheService
         )
     {
         _taskQueue = taskQueue;
+        _cacheService = cacheService;
         _logger = logger;
         _cancellationToken = appLifetime.ApplicationStopping;
         _dbService = dbService;
-        _serviceProvider = serviceProvider;
     }
     
-    public ErrorOr<Created> CreateTranscodeJob(TranscodeJob transcodeJob, bool autoStart = false)
+    public async ValueTask<ErrorOr<Created>> CreateTranscodeJob(TranscodeJob transcodeJob, bool autoStart = false)
     {
         var result = _dbService.CreateData(transcodeJob);
         if (result.IsError) return result;
+        
+        _cacheService.SetData($"trans_job_{transcodeJob.Id}", transcodeJob, DateTimeOffset.Now.AddDays(7));
 
         if (autoStart)
-            StartTranscodeJob(transcodeJob);
+            await StartTranscodeJob(transcodeJob);
         return Result.Created;
     }
     public ErrorOr<TranscodeJob> GetTranscodeJob(Guid id)
     {
-        throw new System.NotImplementedException();
+        var t = _cacheService.GetData<TranscodeJob>($"trans_job_{id}");
+        if (!t.IsError) return t;
+        return _dbService.GetData(id);
     }
     public ErrorOr<List<TranscodeJob>> GetTranscodeJobs()
     {
         throw new System.NotImplementedException();
     }
     
-    public async void StartTranscodeJob(TranscodeJob transcodeJob)
+    public async ValueTask StartTranscodeJob(TranscodeJob transcodeJob)
     {
-        
+        transcodeJob.setRunning();
+        _dbService.UpdateData(transcodeJob);
+        _cacheService.SetData($"trans_job_{transcodeJob.Id}", transcodeJob, DateTimeOffset.Now.AddDays(7));
         var cancellationTokenSource = new CancellationTokenSource();
         _cancellationSources.Add(transcodeJob.Id, cancellationTokenSource);
-        await _taskQueue.QueueBackgroundWorkItemAsync(new TranscodeProcessingJob(_logger, transcodeJob, cancellationTokenSource.Token, _serviceProvider));
+        await _taskQueue.QueueBackgroundWorkItemAsync(new TranscodeProcessingJob(transcodeJob, cancellationTokenSource.Token));
+        // await _taskQueue.QueueBackgroundWorkItemAsync(new TranscodeProcessingJob(_logger, transcodeJob, cancellationTokenSource, _dbService, _cacheService));
     }
     
-    public ErrorOr<Updated> StopTranscodeJob(Guid id)
+    public ErrorOr<TranscodeJob> StopTranscodeJob(Guid id)
     {
         if (_cancellationSources.ContainsKey(id))
         {
             _cancellationSources[id].Cancel();
             _cancellationSources.Remove(id);
-            return Result.Updated;
+            _logger.LogInformation("Stop triggered.");
         }
-        return Errors.Errors.TranscodeJob.NotFound;
+
+        var result = GetTranscodeJob(id);
+        if (result.IsError) return Errors.Errors.TranscodeJob.NotFound;
+        var transcodeJob = result.Value;
+        transcodeJob.setCanceled();
+        _dbService.UpdateData(transcodeJob);
+        _cacheService.SetData($"trans_job_{transcodeJob.Id}", transcodeJob, DateTimeOffset.Now.AddDays(7));
+        return transcodeJob;
     }
 }

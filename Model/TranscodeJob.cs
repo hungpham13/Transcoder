@@ -6,13 +6,13 @@ namespace Transcoder.Model;
 
 public class TranscodeJob : BaseEntity
 {
-    public int Status { get; private set; }
-    public int Profile { get; private set; }
-    public string InputPath { get; private set; }
-    public string OutputPath { get; private set; }
-    public float PercentageDone { get; private set; }
-    public DateTime CreatedAt { get; private set; }
-    public string? Note { get; private set; }
+    public int Status { get; set; }
+    public int Profile { get;  set; }
+    public string InputPath { get;  set; }
+    public string OutputPath { get;  set; }
+    public float PercentageDone { get;  set; }
+    public DateTime CreatedAt { get;  set; }
+    public string? Note { get; set; }
 
     TranscodeJob()
     {
@@ -38,6 +38,10 @@ public class TranscodeJob : BaseEntity
         CreatedAt = createdAt;
         Note = note;
     }
+    public void setPercentage(float percentage)
+    {
+        PercentageDone = percentage;
+    }
     public void setComplete()
     {
         Status = 0;
@@ -53,6 +57,11 @@ public class TranscodeJob : BaseEntity
     {
         Status = 2;
         Note = $"Error: {error}";
+    }
+    public void setCanceled()
+    {
+        Status = 4;
+        Note = $"Canceled at {DateTime.Now}";
     }
 
     private static ErrorOr<TranscodeJob> Create(
