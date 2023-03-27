@@ -66,13 +66,14 @@ public class TranscodeJobsController : ApiController
     }
     
     [HttpGet("")]
-    public IActionResult GetJobs()
+    public IActionResult GetJobs(int status = -1)
     {
-        _logger.LogInformation("MonitorAsync Loop is starting.");
-        return Ok();
+        var result = _transcodeService.GetTranscodeJobs(status);
+        if (result.IsError) return Problem(result.Errors);
+        return Ok(result.Value.Select(MapTranscodeResponse));
     }
     
-    public static TranscodeJobResponse MapTranscodeResponse(TranscodeJob transcodeJob) => new TranscodeJobResponse
+    private static TranscodeJobResponse MapTranscodeResponse(TranscodeJob transcodeJob) => new TranscodeJobResponse
     (
         transcodeJob.Id,
         transcodeJob.Status,

@@ -35,7 +35,7 @@ public class DatabaseService<T> : IDatabaseService<T> where T : BaseEntity
          var result =  _dbContext.Set<T>().AsQueryable().FirstOrDefault(m=>m.Id== id);
          if (result == null)
          {
-             return Error.NotFound($"Could not find {typeof(T).Name} with id {id}");
+             return Error.NotFound($"{typeof(T).Name}.NotFound",$"Could not find {typeof(T).Name} with id {id}");
          }
          return result;
     }

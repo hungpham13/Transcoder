@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using StackExchange.Redis;
 using ErrorOr;
 using Newtonsoft.Json;
@@ -16,9 +17,11 @@ public class CacheService : ICacheService
     public ErrorOr<T> GetData<T>(string key)
     {
         var value = _cacheDb.StringGet(key);
-        if (!string.IsNullOrEmpty(value))
-            return JsonConvert.DeserializeObject<T>(value);
-        return default;
+        if (!value.HasValue || value.IsNull || string.IsNullOrEmpty(value))
+        {
+            return Error.NotFound($"{typeof(T).Name}.NotFound",$"Could not find {typeof(T).Name} with id {key}");
+        }
+        return JsonConvert.DeserializeObject<T>(value);
     }
 
     public bool SetData<T>(string key, T value, DateTimeOffset expirationTime)

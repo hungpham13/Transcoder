@@ -87,11 +87,18 @@ public class TranscodeProcessingService : ITranscodeProcessingService
         catch (OperationCanceledException e)
         {
             // Prevent throwing if the Delay is cancelled
-            _logger.LogInformation("Queued Background Task {Guid} was error.", transcodeJob.Id);
-            job.setError(e.Message);
+            _logger.LogInformation($"Queued Background Task {transcodeJob.Id} was error: {e.Message}");
+            if (e.Message == "ffmpeg processing was cancelled") {
+                job.setCanceled();
+            }
+            else
+            {
+                job.setError(e.Message);
+            }
         }
+        _cacheService.SetData($"trans_job_{job.Id}", job, DateTimeOffset.Now.AddDays(7));
+        dbContext.Update(job);
         dbContext.SaveChanges();
         // _dbService.UpdateData(job);
-        _cacheService.SetData($"trans_job_{job.Id}", job, DateTimeOffset.Now.AddDays(7));
     }
 }
