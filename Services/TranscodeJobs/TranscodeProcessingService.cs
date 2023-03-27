@@ -11,12 +11,14 @@ public class TranscodeProcessingService : ITranscodeProcessingService
 {
     private readonly ILogger _logger;
     private readonly IServiceProvider _serviceProvider;
+    private readonly CancellationToken _cancellationToken;
     private readonly ICacheService _cacheService;
     // private readonly IDatabaseService<TranscodeJob> _dbService;
     
     public TranscodeProcessingService(
         ILogger<TranscodeProcessingService> logger, 
         ICacheService cacheService,
+        IHostApplicationLifetime appLifetime,
         // IDatabaseService<TranscodeJob> dbService
         IServiceProvider serviceProvider
         )
@@ -24,6 +26,7 @@ public class TranscodeProcessingService : ITranscodeProcessingService
         _logger = logger;
         _serviceProvider = serviceProvider;
         // _dbService = dbService;
+        _cancellationToken = appLifetime.ApplicationStopping;
         _cacheService = cacheService;
     }
     
@@ -73,8 +76,9 @@ public class TranscodeProcessingService : ITranscodeProcessingService
                     .WithVideoFilters(filterOptions => filterOptions
                         .Scale(VideoSize.Ld))
                     .WithFastStart())
-                .NotifyOnProgress(OnPercentageProgess, mediaInfo.Duration)
                 .CancellableThrough(transcodeProcessingJob.CancellationToken)
+                .CancellableThrough(_cancellationToken)
+                .NotifyOnProgress(OnPercentageProgess, mediaInfo.Duration)
                 .ProcessAsynchronously();
                 
             job.setComplete();

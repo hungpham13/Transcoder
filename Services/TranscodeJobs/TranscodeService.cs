@@ -9,16 +9,13 @@ public class TranscodeService : ITranscodeService
 {
     private readonly IBackgroundTaskQueue _taskQueue;
     private readonly ILogger _logger;
-    private readonly CancellationToken _cancellationToken;
     private readonly IDatabaseService<TranscodeJob> _dbService;
     private readonly ICacheService _cacheService;
-    private readonly IDictionary<Guid, CancellationTokenSource> _cancellationSources = new Dictionary<Guid, CancellationTokenSource>();
+    private static readonly IDictionary<Guid, CancellationTokenSource> _cancellationSources = new Dictionary<Guid, CancellationTokenSource>();
 
     public TranscodeService(
         IBackgroundTaskQueue taskQueue,
-        IServiceProvider serviceProvider,
         ILogger<TranscodeService> logger,
-        IHostApplicationLifetime appLifetime,
         IDatabaseService<TranscodeJob> dbService,
         ICacheService cacheService
         )
@@ -26,7 +23,6 @@ public class TranscodeService : ITranscodeService
         _taskQueue = taskQueue;
         _cacheService = cacheService;
         _logger = logger;
-        _cancellationToken = appLifetime.ApplicationStopping;
         _dbService = dbService;
     }
     
